@@ -1,19 +1,20 @@
 #include <assert.h>
 #include <iostream>
+#include <math.h>
 #include <omp.h>
-#define DIMEN (2)
+#define DIMEN (5)
 #define THREADS (8)
 #define PSO_C1 (2)
 #define PSO_C2 (2)
 #define PSO_MAX_W (0.9)
 #define PSO_MIN_W (0.4)
-#define random(from, to) (rand() % ((to) - (from)) + (from))
+#define rand_double() ((double)rand() / RAND_MAX)
 using namespace std;
 
 /**
  * Type definitions
  */
-typedef int Valtype;
+typedef double Valtype;
 typedef struct Coord
 {
   Valtype ref[DIMEN];
@@ -30,7 +31,6 @@ typedef struct Node
  * Funtion definitions
  */
 Valtype f(Coord coord);
-double rand_double();
 bool compare(Valtype a, Valtype b);
 Node find_global_best(Node *nodes, unsigned int nodes_amount);
 Valtype pso_next_coord(Node node, unsigned int dimen);
@@ -48,7 +48,7 @@ void assign(Node *nodes,
  */
 double w;
 Node global_best;
-const Coord INIT_COORD_RANGE[2] = {{-10, -10}, {10, 10}};
+const Coord COORD_RANGE[2] = {{-5.12, -5.12, -5.12, -5.12, -5.12}, {5.12, 5.12, 5.12, 5.12, 5.12}};
 
 int main()
 {
@@ -77,23 +77,18 @@ int main()
   cout << "Result: (" << global_best.best_coord.ref[0];
   for (unsigned int i = 1; i < DIMEN; i++)
     cout << ", " << global_best.best_coord.ref[i];
-  cout << ").";
+  cout << ") -> " << global_best.best_value << endl;
 
   return 0;
 }
 
 Valtype f(Coord coord)
 {
-  Valtype ret = 0;
+  Valtype ret = 0.0;
   for (unsigned int i = 0; i < DIMEN; i++)
-    ret += coord.ref[i] * coord.ref[i];
+    ret += coord.ref[i] * coord.ref[i] - cos(M_PI * 2.0 * coord.ref[i]) + 10;
   return ret;
 }
-
-double rand_double()
-{
-  return (double)rand() / RAND_MAX;
-};
 
 bool compare(Valtype a, Valtype b)
 {
@@ -121,7 +116,8 @@ void assign(Node *nodes,
     for (unsigned int j = 0; j < DIMEN; j++)
     {
       nodes[i].veloc[j] = next_veloc(nodes[i], j);
-      nodes[i].coord.ref[j] = next_coord(nodes[i], j);
+      Valtype next = next_coord(nodes[i], j);
+      nodes[i].coord.ref[j] = max(min(next, COORD_RANGE[1].ref[j]), COORD_RANGE[0].ref[j]);
     }
     if (calc_best)
     {
@@ -134,7 +130,8 @@ void assign(Node *nodes,
 
 Valtype random_coord(Node _node, unsigned int dimen)
 {
-  return random(INIT_COORD_RANGE[0].ref[dimen], INIT_COORD_RANGE[1].ref[dimen]);
+  Valtype range = COORD_RANGE[1].ref[dimen] - COORD_RANGE[0].ref[dimen];
+  return rand_double() * range + COORD_RANGE[0].ref[dimen];
 }
 
 double random_veloc(Node _node, unsigned int dimen)
