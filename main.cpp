@@ -2,6 +2,7 @@
 #include <iostream>
 #include <math.h>
 #include <omp.h>
+#include <time.h>
 #define DIMEN (5)
 #define THREADS (8)
 #define PSO_C1 (2)
@@ -58,6 +59,7 @@ int main()
   cout << "Number of nodes: ";
   cin >> nodes_amount;
   Node nodes[nodes_amount];
+  time_t start_ts = time(0);
 
   // initialization
   assign(nodes, nodes_amount, false, random_veloc, random_coord);
@@ -74,10 +76,12 @@ int main()
   }
 
   // print
-  cout << "Result: (" << global_best.best_coord.ref[0];
+  cout << "Cost: " << time(0) - start_ts << endl
+       << "Value: " << global_best.best_value << endl
+       << "Coordinate: (" << global_best.best_coord.ref[0];
   for (unsigned int i = 1; i < DIMEN; i++)
     cout << ", " << global_best.best_coord.ref[i];
-  cout << ") -> " << global_best.best_value << endl;
+  cout << ")" << endl;
 
   return 0;
 }
