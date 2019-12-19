@@ -1,0 +1,1 @@
+g++-7 -g -Wall -fopenmp -o main.o main.cpp && ./main.o
