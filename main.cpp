@@ -20,7 +20,7 @@ int main()
     next_gen(nodes, (PSO_MAX_W - PSO_MIN_W) * (times - gen) / times + PSO_MIN_W);
 
   // print
-  std::cout << "Cost: " << time(0) - start_ts << std::endl
+  std::cout << "Cost: " << time(0) - start_ts << "s" << std::endl
             << "Value: " << global_best.best_value << std::endl
             << "Coordinate: (" << global_best.best_coord.ref[0];
   for (unsigned int i = 1; i < DIMEN; i++)
@@ -43,9 +43,9 @@ Valtype coord_in_range(Valtype coord, unsigned int dimen)
 Valtype f(Coord coord)
 {
   Valtype ret = 0.0;
-  for (unsigned int i = 0; i < DIMEN; ret += 10.0 - cos(M_PI * 2.0 * coord.ref[i++]))
-    for (double j = 0.0; j < 1000.0; j++)
-      ret += coord.ref[i] * (j / 1000.0);
+  for (unsigned int i = DIMEN; i--; ret += powf64(coord.ref[i], 2.0) - cos(M_PI * 2.0 * coord.ref[i]))
+    for (unsigned int j = 1000; j--; ret += 0.01)
+      ;
   return ret;
 }
 
