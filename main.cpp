@@ -3,95 +3,31 @@
 #include <math.h>
 #include <omp.h>
 #include <time.h>
-#define DIMEN (5)
-#define THREADS (8)
-#define PSO_C1 (2)
-#define PSO_C2 (2)
-#define PSO_MAX_W (0.9)
-#define PSO_MIN_W (0.4)
+#include "main.hpp"
 #define rand_double() ((double)rand() / RAND_MAX)
-using namespace std;
-
-/**
- * Type definitions
- */
-typedef double Valtype;
-typedef struct Coord
-{
-  Valtype ref[DIMEN];
-} Coord;
-typedef struct Node
-{
-  double veloc[DIMEN];
-  Coord coord;
-  Coord best_coord;
-  Valtype best_value;
-} Node;
-
-/**
- * Funtion definitions
- */
-Valtype f(Coord coord);
-bool compare(Valtype a, Valtype b);
-Node find_global_best(Node *nodes, unsigned int nodes_amount);
-Valtype pso_next_coord(Node node, unsigned int dimen);
-double pso_next_veloc(Node node, unsigned int dimen);
-Valtype random_coord(Node node, unsigned int dimen);
-double random_veloc(Node node, unsigned int dimen);
-void assign(Node *nodes,
-            unsigned int nodes_amount,
-            bool calc_best,
-            double (*next_veloc)(Node node, unsigned int dimen),
-            Valtype (*next_coord)(Node node, unsigned int dimen));
-
-/**
- * Global variables
- */
-double w;
-Node global_best;
-const Coord COORD_RANGE[2] = {{-5.12, -5.12, -5.12, -5.12, -5.12}, {5.12, 5.12, 5.12, 5.12, 5.12}};
 
 int main()
 {
-  unsigned int times, nodes_amount;
-  cout << "Execution times: ";
-  cin >> times;
-  cout << "Number of nodes: ";
-  cin >> nodes_amount;
+  std::cout << "Execution times: ";
+  std::cin >> times;
+  std::cout << "Number of nodes: ";
+  std::cin >> nodes_amount;
   Node nodes[nodes_amount];
   time_t start_ts = time(0);
 
-  // initialization
-  assign(nodes, nodes_amount, false, random_veloc, random_coord);
-  for (unsigned int i = 0; i < nodes_amount; i++)
-    nodes[i].best_value = f(nodes[i].coord), nodes[i].best_coord = nodes[i].coord;
-  global_best = find_global_best(nodes, nodes_amount);
-
-  // pso
+  init_nodes(nodes);
   for (unsigned int gen = 0; gen < times; gen++)
-  {
-    w = ((PSO_MAX_W - PSO_MIN_W) * (times - gen) / times + PSO_MIN_W);
-    assign(nodes, nodes_amount, true, pso_next_veloc, pso_next_coord);
-    global_best = find_global_best(nodes, nodes_amount);
-  }
+    next_gen(nodes, (PSO_MAX_W - PSO_MIN_W) * (times - gen) / times + PSO_MIN_W);
 
   // print
-  cout << "Cost: " << time(0) - start_ts << endl
-       << "Value: " << global_best.best_value << endl
-       << "Coordinate: (" << global_best.best_coord.ref[0];
+  std::cout << "Cost: " << time(0) - start_ts << std::endl
+            << "Value: " << global_best.best_value << std::endl
+            << "Coordinate: (" << global_best.best_coord.ref[0];
   for (unsigned int i = 1; i < DIMEN; i++)
-    cout << ", " << global_best.best_coord.ref[i];
-  cout << ")" << endl;
+    std::cout << ", " << global_best.best_coord.ref[i];
+  std::cout << ")" << std::endl;
 
   return 0;
-}
-
-Valtype f(Coord coord)
-{
-  Valtype ret = 0.0;
-  for (unsigned int i = 0; i < DIMEN; i++)
-    ret += coord.ref[i] * coord.ref[i] - cos(M_PI * 2.0 * coord.ref[i]) + 10;
-  return ret;
 }
 
 bool compare(Valtype a, Valtype b)
@@ -99,38 +35,64 @@ bool compare(Valtype a, Valtype b)
   return a < b;
 }
 
-Node find_global_best(Node *nodes, unsigned int nodes_amount)
+Valtype coord_in_range(Valtype coord, unsigned int dimen)
 {
-  assert(nodes_amount > 0);
-  Node best = nodes[0];
-  for (unsigned int i = 1; i < nodes_amount; i++)
-    best = compare(best.best_value, nodes[i].best_value) ? best : nodes[i];
-  return best;
+  return std::max(std::min(coord, COORD_RANGE[1].ref[dimen]), COORD_RANGE[0].ref[dimen]);
 }
 
-void assign(Node *nodes,
-            unsigned int nodes_amount,
-            bool calc_best,
-            double (*next_veloc)(Node node, unsigned int dimen),
-            Valtype (*next_coord)(Node node, unsigned int dimen))
+Valtype f(Coord coord)
 {
-#pragma omp parallel for num_threads(THREADS)
+  Valtype ret = 0.0;
+  for (unsigned int i = 0; i < DIMEN; i++)
+    ret += coord.ref[i] * coord.ref[i] - cos(M_PI * 2.0 * coord.ref[i]) + 10.0;
+  return ret;
+}
+
+void init_nodes(Node *nodes)
+{
   for (unsigned int i = 0; i < nodes_amount; i++)
   {
     for (unsigned int j = 0; j < DIMEN; j++)
+      nodes[i].veloc[j] = random_veloc(nodes[i], j),
+      nodes[i].coord.ref[j] = random_coord(nodes[i], j);
+    nodes[i].best_value = f(nodes[i].best_coord = nodes[i].coord);
+    if (!i || compare(nodes[i].best_value, global_best.best_value))
+      global_best = nodes[i];
+  }
+}
+
+void next_gen(Node *nodes, double w)
+{
+  Valtype value;
+#pragma omp parallel for num_threads(THREADS) private(value)
+  for (unsigned int i = 0; i < nodes_amount; i++)
+  {
+    for (unsigned int j = 0; j < DIMEN; j++)
+      nodes[i].veloc[j] = pso_next_veloc(nodes[i], j, w),
+      nodes[i].coord.ref[j] = pso_next_coord(nodes[i], j, w);
+    if (compare(value = f(nodes[i].coord), nodes[i].best_value))
     {
-      nodes[i].veloc[j] = next_veloc(nodes[i], j);
-      Valtype next = next_coord(nodes[i], j);
-      nodes[i].coord.ref[j] = max(min(next, COORD_RANGE[1].ref[j]), COORD_RANGE[0].ref[j]);
-    }
-    if (calc_best)
-    {
-      Valtype value = f(nodes[i].coord);
-      if (compare(value, nodes[i].best_value))
-        nodes[i].best_value = value, nodes[i].best_coord = nodes[i].coord;
+      nodes[i].best_value = value, nodes[i].best_coord = nodes[i].coord;
+      if (compare(value, global_best.best_value))
+#pragma omp critical
+        global_best = nodes[i];
     }
   }
 }
+
+Valtype pso_next_coord(Node node, unsigned int dimen, double w)
+{
+  return node.coord.ref[dimen] + node.veloc[dimen];
+};
+
+double pso_next_veloc(Node node, unsigned int dimen, double w)
+{
+  return coord_in_range(
+      w * node.veloc[dimen] +
+          rand_double() * PSO_C1 * (node.best_coord.ref[dimen] - node.coord.ref[dimen]) +
+          rand_double() * PSO_C2 * (global_best.best_coord.ref[dimen] - node.coord.ref[dimen]),
+      dimen);
+};
 
 Valtype random_coord(Node _node, unsigned int dimen)
 {
@@ -141,16 +103,4 @@ Valtype random_coord(Node _node, unsigned int dimen)
 double random_veloc(Node _node, unsigned int dimen)
 {
   return rand_double();
-};
-
-Valtype pso_next_coord(Node node, unsigned int dimen)
-{
-  return node.coord.ref[dimen] + node.veloc[dimen];
-};
-
-double pso_next_veloc(Node node, unsigned int dimen)
-{
-  return w * node.veloc[dimen] +
-         rand_double() * PSO_C1 * (node.best_coord.ref[dimen] - node.coord.ref[dimen]) +
-         rand_double() * PSO_C2 * (global_best.best_coord.ref[dimen] - node.coord.ref[dimen]);
 };
