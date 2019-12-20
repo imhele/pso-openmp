@@ -43,8 +43,9 @@ Valtype coord_in_range(Valtype coord, unsigned int dimen)
 Valtype f(Coord coord)
 {
   Valtype ret = 0.0;
-  for (unsigned int i = 0; i < DIMEN; i++)
-    ret += coord.ref[i] * coord.ref[i] - cos(M_PI * 2.0 * coord.ref[i]) + 10.0;
+  for (unsigned int i = 0; i < DIMEN; ret += 10.0 - cos(M_PI * 2.0 * coord.ref[i++]))
+    for (double j = 0.0; j < 1000.0; j++)
+      ret += coord.ref[i] * (j / 1000.0);
   return ret;
 }
 
